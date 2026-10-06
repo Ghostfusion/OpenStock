@@ -91,7 +91,10 @@ Our background jobs are defined in `lib/inngest/functions.ts`.
 Quotes are served by one ordered chain, not by a single vendor:
 
 1. **moomoo** — the local OpenD gateway (official `moomoo-api` WebSocket SDK),
-   configured with `MOOMOO_HOST` / `MOOMOO_PORT` / `MOOMOO_SSL`.
+   configured with `MOOMOO_HOST` / `MOOMOO_PORT` / `MOOMOO_SSL` /
+   `MOOMOO_WEBSOCKET_KEY`. OpenD's GUI serves only `api_port` (raw TCP), so the
+   WebSocket gateway it ships with must be started separately, e.g.
+   `WebSocket.exe -p 33333 -o 11111 -a 127.0.0.1`.
 2. **EODHD** — REST `GET /real-time/{ticker}`, configured with `EODHD_API_KEY`.
 3. **Finnhub** — the existing provider and always the last link.
 
