@@ -178,12 +178,12 @@ describe('normalizeMoomooSnapshot', () => {
 });
 
 describe('moomoo provider', () => {
-    const sdkReturning = (response: unknown, loginRet = 0, seen: string[] = []) => async () => {
+    const sdkReturning = (response: unknown, loginOk = true, seen: string[] = []) => async () => {
         class FakeWebsocket {
-            onlogin: ((ret: number, msg?: string) => void) | null = null;
+            onlogin: ((success: boolean, message?: unknown) => void) | null = null;
             start(host: string, port: number, ssl: boolean, key?: string) {
                 seen.push([host, port, ssl, key].join('|'));
-                queueMicrotask(() => this.onlogin?.(loginRet));
+                queueMicrotask(() => this.onlogin?.(loginOk));
             }
             stop() {}
             async GetSecuritySnapshot() {
@@ -201,6 +201,7 @@ describe('moomoo provider', () => {
         });
 
         const quote = await moomoo.fetchQuote('AAPL', 0);
+        // (loginOk defaults to true)
         expect(quote?.c).toBe(10);
         expect(quote?.pc).toBe(9);
     });
@@ -211,7 +212,7 @@ describe('moomoo provider', () => {
             host: '127.0.0.1',
             port: 33333,
             websocketKey: 'ws-key',
-            loadSdk: sdkReturning({ s2c: { snapshotList: [{ basic: { curPrice: 10 } }] } }, 0, seen),
+            loadSdk: sdkReturning({ s2c: { snapshotList: [{ basic: { curPrice: 10 } }] } }, true, seen),
         });
 
         await moomoo.fetchQuote('AAPL', 0);
@@ -222,7 +223,7 @@ describe('moomoo provider', () => {
         const moomoo = createMoomooQuoteProvider({
             host: '127.0.0.1',
             port: 11111,
-            loadSdk: sdkReturning({}, 1),
+            loadSdk: sdkReturning({}, false),
         });
 
         await expect(moomoo.fetchQuote('AAPL', 0)).rejects.toThrow('login failed');

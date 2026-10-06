@@ -308,15 +308,18 @@ INNGEST_EVENT_KEY=your_inngest_event_key
 # HTTP error or timeout the chain fails over to the next, never retrying.
 # EODHD (eodhd.com) covers US listings (.US tickers).
 # EODHD_API_KEY=your_eodhd_api_key
-# moomoo: OpenD's WebSocket gateway (WebSocket.exe) must already be running and
-# logged in; the app connects to it and does not start it (MOOMOO_AUTOSTART /
-# MOOMOO_OPEND_PATH are not used). MOOMOO_PORT is the gateway's port (OpenD.xml
-# `websocket_port`), not the API port (api_port).
+# moomoo: the Node SDK speaks WebSocket, but OpenD's GUI only listens on api_port
+# (11111, raw TCP). Start OpenD's bundled WebSocket gateway yourself; the app
+# connects to it and never launches it (MOOMOO_AUTOSTART / MOOMOO_OPEND_PATH are
+# not used):
+#   WebSocket.exe -p 33333 -o 11111 -a 127.0.0.1
+# If OpenD.xml points websocket_private_key / websocket_cert at files that do not
+# exist, the GUI never opens websocket_port; passing -p to the gateway avoids that.
 # MOOMOO_HOST=127.0.0.1
 # MOOMOO_PORT=33333
 # MOOMOO_SSL=false
-# Plaintext key for the WebSocket gateway; required when OpenD.xml sets
-# websocket_key_md5 (the key that md5 was made from)
+# Plaintext key; only needed when the gateway runs with -k (or OpenD.xml sets
+# websocket_key_md5)
 # MOOMOO_WEBSOCKET_KEY=your_websocket_key
 
 # Social sign-in (optional; each provider is hidden server-side until set)
@@ -386,15 +389,18 @@ INNGEST_EVENT_KEY=your_inngest_event_key
 # HTTP error or timeout the chain fails over to the next, never retrying.
 # EODHD (eodhd.com) covers US listings (.US tickers).
 # EODHD_API_KEY=your_eodhd_api_key
-# moomoo: OpenD's WebSocket gateway (WebSocket.exe) must already be running and
-# logged in; the app connects to it and does not start it (MOOMOO_AUTOSTART /
-# MOOMOO_OPEND_PATH are not used). MOOMOO_PORT is the gateway's port (OpenD.xml
-# `websocket_port`), not the API port (api_port).
+# moomoo: the Node SDK speaks WebSocket, but OpenD's GUI only listens on api_port
+# (11111, raw TCP). Start OpenD's bundled WebSocket gateway yourself; the app
+# connects to it and never launches it (MOOMOO_AUTOSTART / MOOMOO_OPEND_PATH are
+# not used):
+#   WebSocket.exe -p 33333 -o 11111 -a 127.0.0.1
+# If OpenD.xml points websocket_private_key / websocket_cert at files that do not
+# exist, the GUI never opens websocket_port; passing -p to the gateway avoids that.
 # MOOMOO_HOST=127.0.0.1
 # MOOMOO_PORT=33333
 # MOOMOO_SSL=false
-# Plaintext key for the WebSocket gateway; required when OpenD.xml sets
-# websocket_key_md5 (the key that md5 was made from)
+# Plaintext key; only needed when the gateway runs with -k (or OpenD.xml sets
+# websocket_key_md5)
 # MOOMOO_WEBSOCKET_KEY=your_websocket_key
 
 # Social sign-in (optional; each provider is hidden server-side until set)
@@ -478,9 +484,13 @@ public/assets/images/   # logos and screenshots
       Finnhub-only.
     - Configure with `MOOMOO_HOST`/`MOOMOO_PORT`/`MOOMOO_SSL` and `EODHD_API_KEY`.
       Without them, Finnhub remains the only provider and nothing changes.
-    - OpenD must already be running and logged in; the app does not launch it, so
-      `MOOMOO_AUTOSTART` and `MOOMOO_OPEND_PATH` are not used. The moomoo Node SDK
-      needs Node 22+ (`Promise.withResolvers`).
+    - OpenD must be running and logged in, and its WebSocket gateway started
+      separately — the app does not launch either, so `MOOMOO_AUTOSTART` and
+      `MOOMOO_OPEND_PATH` are not used. The moomoo Node SDK needs Node 22+
+      (`Promise.withResolvers`).
+    - The gateway ships with OpenD: `WebSocket.exe -p 33333 -o 11111 -a 127.0.0.1`.
+      OpenD's GUI only opens `api_port` (11111, raw TCP); the SDK needs this
+      WebSocket gateway on `websocket_port` (33333 here).
 
 - TradingView
     - Embeddable widgets used for charts, heatmap, quotes, and timelines.

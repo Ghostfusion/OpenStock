@@ -89,8 +89,11 @@ async function fetchMoomooSnapshot(
         );
         return normalizeMoomooSnapshot(response);
     } finally {
+        // stop() only unregisters the push callback; the socket itself is closed through
+        // websock.close(), which also suppresses the SDK's auto-reconnect.
         try {
             client.stop();
+            client.websock?.close();
         } catch {
             // Closing a connection that may already be gone is not worth surfacing.
         }
@@ -103,10 +106,11 @@ function waitForLogin(client: MoomooClient): Promise<void> {
         () => reject(new Error("moomoo: OpenD login timeout")),
         LOGIN_TIMEOUT_MS,
     );
-    client.onlogin = (ret) => {
+    // The SDK calls onlogin(true, response) on success and onlogin(false, error) on failure.
+    client.onlogin = (success) => {
         clearTimeout(timer);
-        if (ret === 0) resolve();
-        else reject(new Error(`moomoo: OpenD login failed (${ret})`));
+        if (success) resolve();
+        else reject(new Error("moomoo: OpenD login failed"));
     };
     return promise;
 }
