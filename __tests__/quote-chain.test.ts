@@ -193,6 +193,24 @@ describe('moomoo provider', () => {
         return { default: FakeWebsocket as unknown as new () => MoomooClient };
     };
 
+    // Fails the first request only, to pin what the provider does with each error shape.
+    const sdkFailingOnce = (seen: string[], fail: () => Promise<never> | undefined) => async () => {
+        class FakeWebsocket {
+            onlogin: ((success: boolean, message?: unknown) => void) | null = null;
+            start(host: string, port: number, ssl: boolean, key?: string) {
+                seen.push([host, port, ssl, key].join('|'));
+                queueMicrotask(() => this.onlogin?.(true));
+            }
+            stop() {}
+            async GetSecuritySnapshot() {
+                const failure = fail();
+                if (failure) return failure;
+                return { s2c: { snapshotList: [{ basic: { curPrice: 10 } }] } };
+            }
+        }
+        return { default: FakeWebsocket as unknown as new () => MoomooClient };
+    };
+
     it('connects to OpenD and normalizes the snapshot', async () => {
         const moomoo = createMoomooQuoteProvider({
             host: '127.0.0.1',
@@ -217,6 +235,53 @@ describe('moomoo provider', () => {
 
         await moomoo.fetchQuote('AAPL', 0);
         expect(seen[0]).toBe('127.0.0.1|33333|false|ws-key');
+    });
+
+    it('reuses one connection for every quote', async () => {
+        const seen: string[] = [];
+        const moomoo = createMoomooQuoteProvider({
+            host: '127.0.0.1',
+            port: 33333,
+            loadSdk: sdkReturning({ s2c: { snapshotList: [{ basic: { curPrice: 10 } }] } }, true, seen),
+        });
+
+        await moomoo.fetchQuote('AAPL', 0);
+        await moomoo.fetchQuote('MSFT', 0);
+        expect(seen).toHaveLength(1);
+    });
+
+    it('drops the connection on a transport failure and reconnects for the next quote', async () => {
+        const starts: string[] = [];
+        let attempts = 0;
+        const moomoo = createMoomooQuoteProvider({
+            host: '127.0.0.1',
+            port: 33333,
+            loadSdk: sdkFailingOnce(starts, () => {
+                attempts += 1;
+                return attempts === 1 ? Promise.reject('error websock not ready') : undefined;
+            }),
+        });
+
+        await expect(moomoo.fetchQuote('AAPL', 0)).rejects.toBe('error websock not ready');
+        expect(await moomoo.fetchQuote('MSFT', 0)).toMatchObject({ c: 10 });
+        expect(starts).toHaveLength(2);
+    });
+
+    it('keeps the connection when OpenD rejects the request itself', async () => {
+        const starts: string[] = [];
+        let attempts = 0;
+        const moomoo = createMoomooQuoteProvider({
+            host: '127.0.0.1',
+            port: 33333,
+            loadSdk: sdkFailingOnce(starts, () => {
+                attempts += 1;
+                return attempts === 1 ? Promise.reject({ retType: -1, retMsg: 'Unknown stock' }) : undefined;
+            }),
+        });
+
+        await expect(moomoo.fetchQuote('AAPL', 0)).rejects.toMatchObject({ retType: -1 });
+        expect(await moomoo.fetchQuote('MSFT', 0)).toMatchObject({ c: 10 });
+        expect(starts).toHaveLength(1);
     });
 
     it('rejects when OpenD login fails, so the chain fails over', async () => {

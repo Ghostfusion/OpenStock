@@ -491,6 +491,10 @@ public/assets/images/   # logos and screenshots
     - The gateway ships with OpenD: `WebSocket.exe -p 33333 -o 11111 -a 127.0.0.1`.
       OpenD's GUI only opens `api_port` (11111, raw TCP); the SDK needs this
       WebSocket gateway on `websocket_port` (33333 here).
+    - `MOOMOO_PORT` must be the gateway's port, not `api_port`. The process
+      environment wins over `.env`, so a stale exported `MOOMOO_PORT` silently
+      sends the provider at the raw TCP port, where every quote times out.
+    - The provider logs in once and reuses that connection for every quote.
 
 - TradingView
     - Embeddable widgets used for charts, heatmap, quotes, and timelines.
