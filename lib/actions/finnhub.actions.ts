@@ -10,6 +10,7 @@ import { createQuoteChain } from '@/lib/providers/chain';
 import { createEodhdQuoteProvider } from '@/lib/providers/eodhd';
 import { createMoomooQuoteProvider } from '@/lib/providers/moomoo';
 import type { ProviderQuote, QuoteProvider } from '@/lib/providers/types';
+import { toSearchResults, type SearchStockCandidate } from './finnhub.helpers';
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 // Key pool: each free key has its own 60 req/min, so N keys = N x the quota. Rotated per request.
@@ -50,17 +51,6 @@ type FinnhubCompanyProfile = {
     finnhubIndustry?: string;
     weburl?: string;
 };
-
-type SearchStockCandidate = FinnhubSearchResult & {
-    __exchange?: string;
-};
-
-const FINNHUB_EXCHANGE_SUFFIXES = new Set([
-    'AS', 'AT', 'AX', 'BA', 'BK', 'BO', 'BR', 'CO', 'DE', 'F', 'HE', 'HK',
-    'IL', 'IS', 'JK', 'JO', 'KL', 'KQ', 'KS', 'L', 'LS', 'MC', 'MI', 'MX',
-    'NS', 'NZ', 'OL', 'PA', 'PR', 'SA', 'SI', 'SS', 'ST', 'SW', 'SZ', 'T',
-    'TA', 'TO', 'TW', 'TWO', 'V', 'VI', 'WA',
-]);
 
 // Thrown instead of calling Finnhub while an endpoint is in its failure cool-down; not worth logging again.
 class RecentFailure extends Error {}
@@ -149,21 +139,6 @@ async function fetchJSON<T>(url: string, revalidateSeconds = 0): Promise<T> {
     if (hit.failed) throw new RecentFailure(`Finnhub request failed recently: ${url.split('?')[0]}`);
     if (hit.freshUntil < Date.now()) refresh().catch(() => { /* keep serving the stale value */ });
     return hit.value as T;
-}
-
-function getExchangeLabel(symbol: string, exchange?: string) {
-    if (exchange?.trim()) {
-        return exchange.trim();
-    }
-
-    const parts = symbol.split('.');
-    const suffix = parts.length > 1 ? parts[parts.length - 1].toUpperCase() : '';
-
-    if (!suffix) {
-        return 'US';
-    }
-
-    return FINNHUB_EXCHANGE_SUFFIXES.has(suffix) ? suffix : 'US';
 }
 
 // Finnhub is the last link in the chain; keep its own cache and limiter semantics.
@@ -357,25 +332,7 @@ export const searchStocks = cache(async (query?: string): Promise<StockWithWatch
             results = Array.isArray(data?.result) ? data.result : [];
         }
 
-        const mapped: StockWithWatchlistStatus[] = results
-            .map((r) => {
-                const upper = (r.symbol || '').toUpperCase();
-                const name = r.description || upper;
-                const exchangeFromProfile = r.__exchange;
-                const exchange = getExchangeLabel(upper, exchangeFromProfile);
-                const type = r.type || 'Stock';
-                const item: StockWithWatchlistStatus = {
-                    symbol: upper,
-                    name,
-                    exchange,
-                    type,
-                    isInWatchlist: false,
-                };
-                return item;
-            })
-            .slice(0, 15);
-
-        return mapped;
+        return toSearchResults(results, 15);
     } catch (err) {
         console.error('Error in stock search:', err);
         return [];
