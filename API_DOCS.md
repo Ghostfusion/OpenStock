@@ -8,7 +8,7 @@
 
   <p>
     <img src="https://img.shields.io/badge/status-active-success?style=for-the-badge" alt="Status" />
-    <img src="https://img.shields.io/badge/AI-Gemini%20%2B%20Siray-blueviolet?style=for-the-badge" alt="AI Stack" />
+    <img src="https://img.shields.io/badge/AI-OpenRouter%20%2B%20fallback-blueviolet?style=for-the-badge" alt="AI Stack" />
     <img src="https://img.shields.io/badge/license-AGPL--3.0-blue?style=for-the-badge" alt="License" />
   </p>
 </div>
@@ -27,9 +27,9 @@ We don't rely on a single point of failure. Our AI infrastructure automatically 
 graph LR
     A[User Action / Cron] -->|Trigger| B(Inngest Function);
     B --> C{Primary Provider};
-    C -->|Gemini 2.5 Flash Lite| D[Generate Content];
+    C -->|OpenRouter, QUICK_THINK_LLM| D[Generate Content];
     C -.->|Error / Rate Limit| E{Fallback Provider};
-    E -->|Siray.ai Ultra| D;
+    E -->|Gemini / MiniMax / Siray| D;
     D --> F[Email / Notification];
     
     style C fill:#20c997,stroke:#333,stroke-width:2px,color:black
@@ -41,13 +41,13 @@ graph LR
 
 ## 🤝 AI Partners
 
-### Primary: Google Gemini
-The workhorse of our generative content. Fast, efficient, and deeply integrated via Inngest.
+### Primary: OpenRouter
+The default provider. The model is the `QUICK_THINK_LLM` slug (for example `deepseek/deepseek-v4.1-flash`), so the model can change without touching code.
 
-### Fallback: Siray.ai
+### Fallback: Gemini, MiniMax or Siray.ai
 > [!IMPORTANT]
 > **Zero Downtime Guarantee.**
-> When Gemini wavers, **Siray.ai** takes over instantly. No user request is ever dropped.
+> When the primary wavers, the first configured fallback (Gemini, MiniMax or Siray.ai) takes over instantly. No user request is ever dropped.
 
 <div align="center">
   <br/>
@@ -81,6 +81,27 @@ Our background jobs are defined in `lib/inngest/functions.ts`.
 *   **Base URL:** `https://finnhub.io/api/v1`
 *   **Key Features:** Real-time quotes, technical indicators, market news.
 *   **Auth:** `NEXT_PUBLIC_FINNHUB_API_KEY`
+
+</details>
+
+<details>
+<summary><b>🔗 Quote Providers: single fail-safe chain</b></summary>
+<br/>
+
+Quotes are served by one ordered chain, not by a single vendor:
+
+1. **moomoo** — the local OpenD gateway (official `moomoo-api` WebSocket SDK),
+   configured with `MOOMOO_HOST` / `MOOMOO_PORT` / `MOOMOO_SSL`.
+2. **EODHD** — REST `GET /real-time/{ticker}`, configured with `EODHD_API_KEY`.
+3. **Finnhub** — the existing provider and always the last link.
+
+Each provider is tried once. On any HTTP error (401/403/404/429/5xx) or a timeout,
+the chain *fails over* to the next provider; it never retries the same one. A
+provider that just failed is skipped for a minute. Providers that cannot map a
+symbol confidently return nothing and the chain continues.
+
+Only US listings are mapped by the moomoo and EODHD adapters today; everything else
+falls through to Finnhub. Search, company profiles, and news remain Finnhub-only.
 
 </details>
 

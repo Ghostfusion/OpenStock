@@ -106,7 +106,7 @@ Auth & Data
 - TradingView embeddable widgets
 
 Automation & Comms
-- Inngest (events, cron, AI inference via Gemini)
+- Inngest (events, cron, AI inference via OpenRouter)
 - Nodemailer (Gmail transport)
 - next-themes, cmdk (command palette), react-hook-form
 
@@ -132,7 +132,7 @@ Language composition
 - Personalized onboarding
     - Collects country, investment goals, risk tolerance, preferred industry
 - Email & automation
-    - AI-personalized welcome email (Gemini via Inngest)
+    - AI-personalized welcome email (OpenRouter via Inngest)
     - Weekly news summary email (cron) sent as a Kit broadcast
 - Polished UI
     - shadcn/ui components, Radix primitives, Tailwind v4 design tokens
@@ -143,7 +143,7 @@ Language composition
 ## 🤸 Quick Start <a name="quick-start"></a>
 
 Prerequisites
-- Node.js 20+ and pnpm or npm
+- Node.js 22+ and pnpm or npm (22+ is required by the moomoo quote provider)
 - MongoDB connection string (MongoDB Atlas or local via Docker Compose)
 - Finnhub API key (free tier supported; real-time may require paid)
 - Optional: Gmail account for email (or update Nodemailer transport) if you want welcome and news summary emails
@@ -275,11 +275,15 @@ FINNHUB_BASE_URL=https://finnhub.io/api/v1
 ADANOS_API_KEY=your_adanos_api_key
 # ADANOS_API_BASE_URL=https://api.adanos.org
 
-# AI Provider (optional, default: "gemini")
-# Supported: "gemini", "minimax", "siray"
-# AI_PROVIDER=gemini
+# AI Provider (optional, default: "openrouter")
+# Supported: "openrouter", "gemini", "minimax", "siray"
+# AI_PROVIDER=openrouter
 
-# Gemini
+# OpenRouter (default provider)
+OPENROUTER_API_KEY=your_openrouter_api_key
+QUICK_THINK_LLM=deepseek/deepseek-v4.1-flash
+
+# Gemini (optional provider or fallback)
 GEMINI_API_KEY=your_gemini_api_key
 
 # MiniMax (optional, used when AI_PROVIDER=minimax or as fallback)
@@ -298,6 +302,19 @@ INNGEST_EVENT_KEY=your_inngest_event_key
 # "cached" (default) refreshes quotes hourly for everyone; "realtime" refreshes every 15s
 # and turns on email price alerts (an OpenStock Cloud feature).
 # NEXT_PUBLIC_OPENSTOCK_DATA_MODE=cached
+
+# Quote providers (optional). Quotes come from one fail-safe chain:
+# moomoo (local OpenD) -> EODHD -> Finnhub. Each provider is tried once; on an
+# HTTP error or timeout the chain fails over to the next, never retrying.
+# EODHD (eodhd.com) covers US listings (.US tickers).
+# EODHD_API_KEY=your_eodhd_api_key
+# moomoo: an OpenD gateway must already be running locally and logged in; the app
+# connects to it and does not start it (MOOMOO_AUTOSTART / MOOMOO_OPEND_PATH are
+# not used). MOOMOO_PORT must be OpenD's WebSocket port (its `websocket_port`),
+# not the API port.
+# MOOMOO_HOST=127.0.0.1
+# MOOMOO_PORT=11111
+# MOOMOO_SSL=false
 
 # Social sign-in (optional; each provider is hidden server-side until set)
 # Callback URLs: <BETTER_AUTH_URL>/api/auth/callback/google and /api/auth/callback/github
@@ -333,11 +350,15 @@ FINNHUB_BASE_URL=https://finnhub.io/api/v1
 ADANOS_API_KEY=your_adanos_api_key
 # ADANOS_API_BASE_URL=https://api.adanos.org
 
-# AI Provider (optional, default: "gemini")
-# Supported: "gemini", "minimax", "siray"
-# AI_PROVIDER=gemini
+# AI Provider (optional, default: "openrouter")
+# Supported: "openrouter", "gemini", "minimax", "siray"
+# AI_PROVIDER=openrouter
 
-# Gemini
+# OpenRouter (default provider)
+OPENROUTER_API_KEY=your_openrouter_api_key
+QUICK_THINK_LLM=deepseek/deepseek-v4.1-flash
+
+# Gemini (optional provider or fallback)
 GEMINI_API_KEY=your_gemini_api_key
 
 # MiniMax (optional, used when AI_PROVIDER=minimax or as fallback)
@@ -356,6 +377,19 @@ INNGEST_EVENT_KEY=your_inngest_event_key
 # "cached" (default) refreshes quotes hourly for everyone; "realtime" refreshes every 15s
 # and turns on email price alerts (an OpenStock Cloud feature).
 # NEXT_PUBLIC_OPENSTOCK_DATA_MODE=cached
+
+# Quote providers (optional). Quotes come from one fail-safe chain:
+# moomoo (local OpenD) -> EODHD -> Finnhub. Each provider is tried once; on an
+# HTTP error or timeout the chain fails over to the next, never retrying.
+# EODHD (eodhd.com) covers US listings (.US tickers).
+# EODHD_API_KEY=your_eodhd_api_key
+# moomoo: an OpenD gateway must already be running locally and logged in; the app
+# connects to it and does not start it (MOOMOO_AUTOSTART / MOOMOO_OPEND_PATH are
+# not used). MOOMOO_PORT must be OpenD's WebSocket port (its `websocket_port`),
+# not the API port.
+# MOOMOO_HOST=127.0.0.1
+# MOOMOO_PORT=11111
+# MOOMOO_SSL=false
 
 # Social sign-in (optional; each provider is hidden server-side until set)
 # Callback URLs: <BETTER_AUTH_URL>/api/auth/callback/google and /api/auth/callback/github
@@ -427,6 +461,20 @@ public/assets/images/   # logos and screenshots
     - Structured stock sentiment snapshots across Reddit, X.com, news, and Polymarket.
     - Set `ADANOS_API_KEY`; optionally override the API host with `ADANOS_API_BASE_URL`.
     - Used only for the stock detail sentiment card and does not replace Finnhub or TradingView.
+
+- Quote providers (optional fail-safe chain)
+    - Quotes come from one ordered chain: moomoo (local OpenD) -> EODHD -> Finnhub.
+    - Each provider is tried once and the chain fails over to the next on any HTTP
+      error or timeout; it never retries the same provider. A provider that just
+      failed is skipped for a minute so an outage does not slow every request.
+    - moomoo and EODHD are only asked for US listings they can map confidently;
+      everything else falls through to Finnhub. Profiles, search, and news stay
+      Finnhub-only.
+    - Configure with `MOOMOO_HOST`/`MOOMOO_PORT`/`MOOMOO_SSL` and `EODHD_API_KEY`.
+      Without them, Finnhub remains the only provider and nothing changes.
+    - OpenD must already be running and logged in; the app does not launch it, so
+      `MOOMOO_AUTOSTART` and `MOOMOO_OPEND_PATH` are not used. The moomoo Node SDK
+      needs Node 22+ (`Promise.withResolvers`).
 
 - TradingView
     - Embeddable widgets used for charts, heatmap, quotes, and timelines.

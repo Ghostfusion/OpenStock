@@ -1,5 +1,5 @@
-# Use official Node.js 20 Alpine image as base
-FROM node:20-alpine
+# Use official Node.js 22 Alpine image as base (the moomoo provider uses Promise.withResolvers)
+FROM node:22-alpine
 
 # Set working directory
 WORKDIR /app

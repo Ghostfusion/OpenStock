@@ -2,14 +2,15 @@
  * AI Provider abstraction for OpenStock.
  *
  * Supports multiple LLM backends via the AI_PROVIDER environment variable:
- *   - "gemini"  (default) – Google Gemini REST API
- *   - "minimax" – MiniMax (OpenAI-compatible)
- *   - "siray"   – Siray.ai (OpenAI-compatible)
+ *   - "openrouter" (default) – OpenRouter (OpenAI-compatible), model from QUICK_THINK_LLM
+ *   - "gemini"   – Google Gemini REST API
+ *   - "minimax"  – MiniMax (OpenAI-compatible)
+ *   - "siray"    – Siray.ai (OpenAI-compatible)
  *
  * Each provider returns a plain-text string from the model.
  */
 
-export type AIProviderName = "gemini" | "minimax" | "siray";
+export type AIProviderName = "openrouter" | "gemini" | "minimax" | "siray";
 
 export interface AIProviderConfig {
   name: AIProviderName;
@@ -27,9 +28,19 @@ export function getProviderConfig(
   const name =
     provider ||
     (process.env.AI_PROVIDER as AIProviderName) ||
-    "gemini";
+    "openrouter";
 
   switch (name) {
+    case "openrouter":
+      return {
+        name: "openrouter",
+        apiKey: process.env.OPENROUTER_API_KEY || "",
+        baseUrl:
+          process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
+        // The OpenRouter model slug to think with, e.g. "deepseek/deepseek-v4.1-flash"
+        model: process.env.QUICK_THINK_LLM || "",
+      };
+
     case "minimax":
       return {
         name: "minimax",
@@ -61,20 +72,31 @@ export function getProviderConfig(
   }
 }
 
+const FALLBACK_ORDER: AIProviderName[] = ["gemini", "minimax", "siray"];
+
+const API_KEY_ENV: Record<AIProviderName, string> = {
+  openrouter: "OPENROUTER_API_KEY",
+  gemini: "GEMINI_API_KEY",
+  minimax: "MINIMAX_API_KEY",
+  siray: "SIRAY_API_KEY",
+};
+
 /**
- * Get the fallback provider: if the primary is Gemini use MiniMax,
- * otherwise fall back to Gemini.
+ * Get the fallback provider. Never returns the primary itself; prefers the first
+ * remaining provider that has a key set, so an unconfigured name is not chosen.
  */
 export function getFallbackProviderName(
   primary: AIProviderName
 ): AIProviderName {
-  if (primary === "gemini") {
-    // Prefer MiniMax as fallback when a key is available, else Siray
-    if (process.env.MINIMAX_API_KEY) return "minimax";
-    if (process.env.SIRAY_API_KEY) return "siray";
-    return "minimax"; // caller will see missing-key error
-  }
-  return "gemini";
+  const candidates =
+    primary === "openrouter"
+      ? FALLBACK_ORDER
+      : FALLBACK_ORDER.filter((name) => name !== primary);
+  return (
+    candidates.find((name) => process.env[API_KEY_ENV[name]]) ??
+    candidates[0] ??
+    "gemini"
+  );
 }
 
 // ── Provider call implementations ──────────────────────────────────
@@ -112,6 +134,14 @@ async function callOpenAICompatible(
   if (!config.apiKey) {
     throw new Error(
       `${config.name.toUpperCase()}_API_KEY is not set`
+    );
+  }
+
+  if (!config.model) {
+    throw new Error(
+      config.name === "openrouter"
+        ? "QUICK_THINK_LLM is not set"
+        : `${config.name} model is not set`
     );
   }
 
@@ -171,7 +201,7 @@ export async function callAIProviderWithFallback(
   prompt: string
 ): Promise<string> {
   const primaryName =
-    (process.env.AI_PROVIDER as AIProviderName) || "gemini";
+    (process.env.AI_PROVIDER as AIProviderName) || "openrouter";
   const fallbackName = getFallbackProviderName(primaryName);
 
   try {

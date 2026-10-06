@@ -4,7 +4,6 @@ import {
   getFallbackProviderName,
   callAIProvider,
   callAIProviderWithFallback,
-  type AIProviderName,
 } from "@/lib/ai-provider";
 
 // ── getProviderConfig ──────────────────────────────────────────────
@@ -16,12 +15,23 @@ describe("getProviderConfig", () => {
     process.env = { ...originalEnv };
   });
 
-  it("defaults to gemini when no env var is set", () => {
+  it("defaults to openrouter when no env var is set", () => {
     delete process.env.AI_PROVIDER;
+    delete process.env.QUICK_THINK_LLM;
     const config = getProviderConfig();
-    expect(config.name).toBe("gemini");
-    expect(config.baseUrl).toContain("generativelanguage.googleapis.com");
-    expect(config.model).toBe("gemini-2.5-flash-lite");
+    expect(config.name).toBe("openrouter");
+    expect(config.baseUrl).toContain("openrouter.ai");
+    expect(config.apiKey).toBe(process.env.OPENROUTER_API_KEY ?? "");
+  });
+
+  it("returns openrouter config with the QUICK_THINK_LLM model", () => {
+    process.env.OPENROUTER_API_KEY = "test-or-key";
+    process.env.QUICK_THINK_LLM = "deepseek/deepseek-v4.1-flash";
+    const config = getProviderConfig("openrouter");
+    expect(config.name).toBe("openrouter");
+    expect(config.baseUrl).toBe("https://openrouter.ai/api/v1");
+    expect(config.model).toBe("deepseek/deepseek-v4.1-flash");
+    expect(config.apiKey).toBe("test-or-key");
   });
 
   it("returns minimax config when provider is minimax", () => {
@@ -92,6 +102,13 @@ describe("getFallbackProviderName", () => {
     expect(getFallbackProviderName("minimax")).toBe("gemini");
   });
 
+  it("returns a keyed provider when primary is openrouter", () => {
+    process.env.GEMINI_API_KEY = "g";
+    delete process.env.MINIMAX_API_KEY;
+    delete process.env.SIRAY_API_KEY;
+    expect(getFallbackProviderName("openrouter")).toBe("gemini");
+  });
+
   it("returns gemini when primary is siray", () => {
     expect(getFallbackProviderName("siray")).toBe("gemini");
   });
@@ -128,6 +145,38 @@ describe("callAIProvider", () => {
     delete process.env.SIRAY_API_KEY;
     await expect(callAIProvider("hello", "siray")).rejects.toThrow(
       "SIRAY_API_KEY is not set"
+    );
+  });
+
+  it("calls OpenRouter with a Bearer token and the QUICK_THINK_LLM model", async () => {
+    process.env.OPENROUTER_API_KEY = "or-key";
+    process.env.QUICK_THINK_LLM = "deepseek/deepseek-v4.1-flash";
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          choices: [{ message: { content: "Hello from OpenRouter" } }],
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await callAIProvider("test prompt", "openrouter");
+    expect(result).toBe("Hello from OpenRouter");
+
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
+    expect(options.headers["Authorization"]).toBe("Bearer or-key");
+    const body = JSON.parse(options.body);
+    expect(body.model).toBe("deepseek/deepseek-v4.1-flash");
+    expect(body.messages[0].content).toBe("test prompt");
+  });
+
+  it("throws when QUICK_THINK_LLM is not set for openrouter", async () => {
+    process.env.OPENROUTER_API_KEY = "or-key";
+    delete process.env.QUICK_THINK_LLM;
+    await expect(callAIProvider("hello", "openrouter")).rejects.toThrow(
+      "QUICK_THINK_LLM is not set"
     );
   });
 
@@ -316,25 +365,24 @@ describe("callAIProviderWithFallback", () => {
     consoleSpy.mockRestore();
   });
 
-  it("uses gemini as default primary and minimax as fallback", async () => {
+  it("uses openrouter as default primary and falls over to a keyed provider", async () => {
     delete process.env.AI_PROVIDER;
+    delete process.env.OPENROUTER_API_KEY; // primary fails before any fetch
     process.env.GEMINI_API_KEY = "g";
-    process.env.MINIMAX_API_KEY = "m";
+    delete process.env.MINIMAX_API_KEY;
 
     let callCount = 0;
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockImplementation((url: string) => {
+      vi.fn().mockImplementation(() => {
         callCount++;
-        if (url.includes("googleapis")) {
-          return Promise.resolve({ ok: false, status: 500, statusText: "Error" });
-        }
-        // MiniMax fallback
         return Promise.resolve({
           ok: true,
           json: () =>
             Promise.resolve({
-              choices: [{ message: { content: "MiniMax fallback" } }],
+              candidates: [
+                { content: { parts: [{ text: "Gemini fallback" }] } },
+              ],
             }),
         });
       })
@@ -342,8 +390,8 @@ describe("callAIProviderWithFallback", () => {
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const result = await callAIProviderWithFallback("test");
-    expect(result).toBe("MiniMax fallback");
-    expect(callCount).toBe(2);
+    expect(result).toBe("Gemini fallback");
+    expect(callCount).toBe(1);
     consoleSpy.mockRestore();
   });
 

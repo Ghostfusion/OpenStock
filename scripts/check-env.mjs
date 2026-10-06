@@ -47,8 +47,10 @@ const optionalVars = {
     'NODEMAILER_EMAIL': 'Gmail address for sending emails',
     'NODEMAILER_PASSWORD': 'Gmail app password (use App Passwords if 2FA enabled; not your regular password)',
 
-    // AI Providers (for Inngest workflows)
-    'GEMINI_API_KEY': 'Google Gemini API key (for AI-powered welcome emails and news summaries)',
+    // AI Providers (for Inngest workflows). OpenRouter is the default provider.
+    'OPENROUTER_API_KEY': 'OpenRouter API key (default AI provider for welcome emails and news summaries)',
+    'QUICK_THINK_LLM': 'OpenRouter model slug for the default provider (e.g. deepseek/deepseek-v4.1-flash)',
+    'GEMINI_API_KEY': 'Google Gemini API key (AI provider or fallback)',
 
     // Adanos sentiment insights (optional alternative data source)
     'ADANOS_API_KEY': 'Adanos API key for stock sentiment insights (Reddit, X.com, news, Polymarket)',
@@ -65,14 +67,20 @@ const optionalVars = {
     'FINNHUB_API_KEYS': 'Comma-separated Finnhub keys, rotated per request (each adds 60 req/min). Falls back to NEXT_PUBLIC_FINNHUB_API_KEY',
     'NEXT_PUBLIC_OPENSTOCK_DATA_MODE': '"cached" (default: quotes refresh hourly, shared by everyone) or "realtime" (every 15s; OpenStock Cloud / self-hosted)',
 
+    // Quote providers (optional). Single fail-safe chain: moomoo -> EODHD -> Finnhub.
+    'EODHD_API_KEY': 'EODHD API key (eodhd.com) for US listings (.US tickers)',
+    'MOOMOO_HOST': 'moomoo OpenD gateway host, e.g. 127.0.0.1',
+    'MOOMOO_PORT': "moomoo OpenD WebSocket port (must match OpenD's websocket_port)",
+    'MOOMOO_SSL': 'Set to "true" when the OpenD WebSocket service uses TLS',
+
     // Social sign-in (Better Auth)
     'GOOGLE_CLIENT_ID': 'Google OAuth client ID (callback: <BETTER_AUTH_URL>/api/auth/callback/google)',
     'GOOGLE_CLIENT_SECRET': 'Google OAuth client secret',
     'GITHUB_CLIENT_ID': 'GitHub OAuth app client ID (callback: <BETTER_AUTH_URL>/api/auth/callback/github)',
     'GITHUB_CLIENT_SECRET': 'GitHub OAuth app client secret',
 
-    // AI Provider selection (defaults to "gemini")
-    'AI_PROVIDER': 'AI provider: "gemini" | "minimax" | "siray" (default: "gemini")',
+    // AI Provider selection (defaults to "openrouter")
+    'AI_PROVIDER': 'AI provider: "openrouter" | "gemini" | "minimax" | "siray" (default: "openrouter")',
 };
 
 /**

@@ -6,6 +6,10 @@ import { cache } from 'react';
 import { QUOTE_TTL_SECONDS } from '@/lib/market-data';
 import { hasFinnhubQuotes } from '@/lib/markets';
 import { getSession } from '@/lib/better-auth/auth';
+import { createQuoteChain } from '@/lib/providers/chain';
+import { createEodhdQuoteProvider } from '@/lib/providers/eodhd';
+import { createMoomooQuoteProvider } from '@/lib/providers/moomoo';
+import type { ProviderQuote, QuoteProvider } from '@/lib/providers/types';
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 // Key pool: each free key has its own 60 req/min, so N keys = N x the quota. Rotated per request.
@@ -162,7 +166,10 @@ function getExchangeLabel(symbol: string, exchange?: string) {
     return FINNHUB_EXCHANGE_SUFFIXES.has(suffix) ? suffix : 'US';
 }
 
-export async function getQuote(symbol: string, revalidateSeconds = 0) {
+// Finnhub is the last link in the chain; keep its own cache and limiter semantics.
+async function getFinnhubQuote(symbol: string, revalidateSeconds = 0): Promise<FinnhubQuote | null> {
+    // Symbols the free plan can't price are skipped instead of spending a request on a 403
+    if (!hasFinnhubQuotes(symbol)) return null;
     try {
         const url = `${FINNHUB_BASE_URL}/quote?symbol=${encodeURIComponent(symbol)}`;
         // Real-time by default; shared views pass a short cache to stay inside Finnhub's 60 req/min
@@ -173,10 +180,34 @@ export async function getQuote(symbol: string, revalidateSeconds = 0) {
     }
 }
 
+// Single fail-safe chain: moomoo (local OpenD) -> EODHD -> Finnhub. Each provider gets one
+// attempt; on an HTTP error or timeout the chain fails over to the next one (never retries).
+const finnhubQuoteProvider: QuoteProvider = {
+    id: 'finnhub',
+    isConfigured: () => FINNHUB_KEYS.length > 0,
+    fetchQuote: getFinnhubQuote,
+};
+
+const QUOTE_PROVIDERS: QuoteProvider[] = [
+    createMoomooQuoteProvider({
+        host: process.env.MOOMOO_HOST,
+        port: process.env.MOOMOO_PORT ? Number(process.env.MOOMOO_PORT) : undefined,
+        ssl: process.env.MOOMOO_SSL === 'true',
+    }),
+    createEodhdQuoteProvider({ apiKey: process.env.EODHD_API_KEY }),
+    finnhubQuoteProvider,
+];
+
+const getQuoteFromChain = createQuoteChain(QUOTE_PROVIDERS);
+
+// A quote from the first provider in the chain that can price the symbol, or null.
+export async function getQuote(symbol: string, revalidateSeconds = 0): Promise<ProviderQuote | null> {
+    return getQuoteFromChain(symbol, revalidateSeconds);
+}
+
 // Shared, short-lived quotes for anything shown live on screen (pages and /api/quotes)
 export async function getLiveQuotes(symbols: string[]) {
-    // Symbols the free plan can't price are skipped instead of spending a request on a 403
-    const quotes = await Promise.all(symbols.map((s) => (hasFinnhubQuotes(s) ? getQuote(s, LIVE_QUOTE_TTL) : null)));
+    const quotes = await Promise.all(symbols.map((s) => getQuote(s, LIVE_QUOTE_TTL)));
     return Object.fromEntries(symbols.map((s, i) => [s, quotes[i]?.c ? quotes[i] : null]));
 }
 
@@ -198,10 +229,11 @@ export async function getWatchlistData(symbols: string[]) {
 
     // Fetch quotes and profiles in parallel
     const promises = symbols.map(async (sym) => {
-        const covered = hasFinnhubQuotes(sym);
-        const [quote, profile] = covered
-            ? await Promise.all([getQuote(sym, LIVE_QUOTE_TTL), getCompanyProfile(sym)])
-            : [null, null];
+        // Quote comes from the provider chain; profile is Finnhub-only (null for anything else)
+        const [quote, profile] = await Promise.all([
+            getQuote(sym, LIVE_QUOTE_TTL),
+            getCompanyProfile(sym),
+        ]);
 
         return {
             symbol: sym,

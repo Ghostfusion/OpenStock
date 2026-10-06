@@ -20,6 +20,7 @@ What OpenStock can show depends on two free data sources. This table was tested 
 - **Dashboard:** pick a market (US, India, Germany, Canada, Australia, Crypto, Forex). US and crypto tiles use our own cached quotes; the others use TradingView quote tiles.
 - **Stock pages:** symbols Finnhub can price get the full header (live price, day range, market cap). Others get TradingView's quote panel.
 - **Alerts:** an OpenStock Cloud feature (or self-hosted in realtime mode). US stocks and crypto only, because the alert checker needs a quote source it can call every five minutes.
+- **Quote providers:** our quotes come from a fail-safe chain (moomoo OpenD → EODHD → Finnhub). With only Finnhub configured, coverage is exactly as in the table below; adding `EODHD_API_KEY` or a local moomoo OpenD widens US coverage. Neither adapter maps non-US symbols yet.
 - **Search:** Finnhub search returns listings worldwide. On exchanges whose chart is blocked, the stock page links to the chart on TradingView instead (the list is `CHART_BLOCKED_EXCHANGES` in `lib/utils.ts`, each confirmed with two tickers).
 
 ## Adding a market
