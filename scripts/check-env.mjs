@@ -72,6 +72,7 @@ const optionalVars = {
     'MOOMOO_HOST': 'moomoo OpenD gateway host, e.g. 127.0.0.1',
     'MOOMOO_PORT': "moomoo OpenD WebSocket port (must match OpenD's websocket_port)",
     'MOOMOO_SSL': 'Set to "true" when the OpenD WebSocket service uses TLS',
+    'MOOMOO_WEBSOCKET_KEY': "Plaintext key for OpenD's WebSocket gateway (required when OpenD.xml sets websocket_key_md5)",
 
     // Social sign-in (Better Auth)
     'GOOGLE_CLIENT_ID': 'Google OAuth client ID (callback: <BETTER_AUTH_URL>/api/auth/callback/google)',

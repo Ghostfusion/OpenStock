@@ -178,10 +178,11 @@ describe('normalizeMoomooSnapshot', () => {
 });
 
 describe('moomoo provider', () => {
-    const sdkReturning = (response: unknown, loginRet = 0) => async () => {
+    const sdkReturning = (response: unknown, loginRet = 0, seen: string[] = []) => async () => {
         class FakeWebsocket {
             onlogin: ((ret: number, msg?: string) => void) | null = null;
-            start() {
+            start(host: string, port: number, ssl: boolean, key?: string) {
+                seen.push([host, port, ssl, key].join('|'));
                 queueMicrotask(() => this.onlogin?.(loginRet));
             }
             stop() {}
@@ -202,6 +203,19 @@ describe('moomoo provider', () => {
         const quote = await moomoo.fetchQuote('AAPL', 0);
         expect(quote?.c).toBe(10);
         expect(quote?.pc).toBe(9);
+    });
+
+    it('connects with the configured host, port and websocket key', async () => {
+        const seen: string[] = [];
+        const moomoo = createMoomooQuoteProvider({
+            host: '127.0.0.1',
+            port: 33333,
+            websocketKey: 'ws-key',
+            loadSdk: sdkReturning({ s2c: { snapshotList: [{ basic: { curPrice: 10 } }] } }, 0, seen),
+        });
+
+        await moomoo.fetchQuote('AAPL', 0);
+        expect(seen[0]).toBe('127.0.0.1|33333|false|ws-key');
     });
 
     it('rejects when OpenD login fails, so the chain fails over', async () => {

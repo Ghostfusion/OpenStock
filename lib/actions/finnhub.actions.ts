@@ -193,6 +193,7 @@ const QUOTE_PROVIDERS: QuoteProvider[] = [
         host: process.env.MOOMOO_HOST,
         port: process.env.MOOMOO_PORT ? Number(process.env.MOOMOO_PORT) : undefined,
         ssl: process.env.MOOMOO_SSL === 'true',
+        websocketKey: process.env.MOOMOO_WEBSOCKET_KEY,
     }),
     createEodhdQuoteProvider({ apiKey: process.env.EODHD_API_KEY }),
     finnhubQuoteProvider,

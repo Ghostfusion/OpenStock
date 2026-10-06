@@ -15,6 +15,8 @@ export type MoomooConfig = {
     host?: string;
     port?: number;
     ssl?: boolean;
+    /** Plaintext key for OpenD's WebSocket service; required when its config sets websocket_key_md5. */
+    websocketKey?: string;
     /** Injectable for tests; defaults to importing the official `moomoo-api` SDK. */
     loadSdk?: () => Promise<MoomooSdkModule>;
 };
@@ -61,7 +63,7 @@ export function createMoomooQuoteProvider(config: MoomooConfig): QuoteProvider {
             if (!code || !config.host || !config.port) return null;
 
             return cachedQuote(`moomoo:${code}`, revalidateSeconds, () =>
-                fetchMoomooSnapshot(loadSdk, config.host!, config.port!, config.ssl ?? false, code),
+                fetchMoomooSnapshot(loadSdk, config, code),
             );
         },
     };
@@ -69,16 +71,14 @@ export function createMoomooQuoteProvider(config: MoomooConfig): QuoteProvider {
 
 async function fetchMoomooSnapshot(
     loadSdk: () => Promise<MoomooSdkModule>,
-    host: string,
-    port: number,
-    ssl: boolean,
+    config: MoomooConfig,
     code: string,
 ): Promise<ProviderQuote | null> {
     const { default: MoomooWebsocket } = await loadSdk();
     const client = new MoomooWebsocket();
     try {
         const loggedIn = waitForLogin(client);
-        client.start(host, port, ssl);
+        client.start(config.host!, config.port!, config.ssl ?? false, config.websocketKey);
         await loggedIn;
 
         // One attempt, no retries: any error fails over to the next provider.

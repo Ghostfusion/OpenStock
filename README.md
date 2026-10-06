@@ -308,13 +308,16 @@ INNGEST_EVENT_KEY=your_inngest_event_key
 # HTTP error or timeout the chain fails over to the next, never retrying.
 # EODHD (eodhd.com) covers US listings (.US tickers).
 # EODHD_API_KEY=your_eodhd_api_key
-# moomoo: an OpenD gateway must already be running locally and logged in; the app
-# connects to it and does not start it (MOOMOO_AUTOSTART / MOOMOO_OPEND_PATH are
-# not used). MOOMOO_PORT must be OpenD's WebSocket port (its `websocket_port`),
-# not the API port.
+# moomoo: OpenD's WebSocket gateway (WebSocket.exe) must already be running and
+# logged in; the app connects to it and does not start it (MOOMOO_AUTOSTART /
+# MOOMOO_OPEND_PATH are not used). MOOMOO_PORT is the gateway's port (OpenD.xml
+# `websocket_port`), not the API port (api_port).
 # MOOMOO_HOST=127.0.0.1
-# MOOMOO_PORT=11111
+# MOOMOO_PORT=33333
 # MOOMOO_SSL=false
+# Plaintext key for the WebSocket gateway; required when OpenD.xml sets
+# websocket_key_md5 (the key that md5 was made from)
+# MOOMOO_WEBSOCKET_KEY=your_websocket_key
 
 # Social sign-in (optional; each provider is hidden server-side until set)
 # Callback URLs: <BETTER_AUTH_URL>/api/auth/callback/google and /api/auth/callback/github
@@ -383,13 +386,16 @@ INNGEST_EVENT_KEY=your_inngest_event_key
 # HTTP error or timeout the chain fails over to the next, never retrying.
 # EODHD (eodhd.com) covers US listings (.US tickers).
 # EODHD_API_KEY=your_eodhd_api_key
-# moomoo: an OpenD gateway must already be running locally and logged in; the app
-# connects to it and does not start it (MOOMOO_AUTOSTART / MOOMOO_OPEND_PATH are
-# not used). MOOMOO_PORT must be OpenD's WebSocket port (its `websocket_port`),
-# not the API port.
+# moomoo: OpenD's WebSocket gateway (WebSocket.exe) must already be running and
+# logged in; the app connects to it and does not start it (MOOMOO_AUTOSTART /
+# MOOMOO_OPEND_PATH are not used). MOOMOO_PORT is the gateway's port (OpenD.xml
+# `websocket_port`), not the API port (api_port).
 # MOOMOO_HOST=127.0.0.1
-# MOOMOO_PORT=11111
+# MOOMOO_PORT=33333
 # MOOMOO_SSL=false
+# Plaintext key for the WebSocket gateway; required when OpenD.xml sets
+# websocket_key_md5 (the key that md5 was made from)
+# MOOMOO_WEBSOCKET_KEY=your_websocket_key
 
 # Social sign-in (optional; each provider is hidden server-side until set)
 # Callback URLs: <BETTER_AUTH_URL>/api/auth/callback/google and /api/auth/callback/github
