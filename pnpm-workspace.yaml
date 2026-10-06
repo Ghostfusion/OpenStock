@@ -1,4 +1,8 @@
 allowBuilds:
+  # Tailwind v4's native engine: its install step puts the platform binary in place.
+  '@tailwindcss/oxide': true
+  # Verified unnecessary: pnpm test/build/lint pass and next/image still optimizes
+  # through the optional @img/sharp-win32-x64 package.
   protobufjs: false
   sharp: false
   unrs-resolver: false
